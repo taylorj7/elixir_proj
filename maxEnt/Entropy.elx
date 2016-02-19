@@ -1,6 +1,6 @@
 defmodule Entropy do
     def count_unique_words(s)  do
-        [_, count] = (String.split(s, " ")
+        (String.split(s, " ")
             |> Enum.reduce([[],0],
                 fn (elem,[a1,a2]) ->
                     if Enum.any?(a1, fn(e) -> e == elem end) do
@@ -9,10 +9,9 @@ defmodule Entropy do
                         [a1 ++ [elem], a2 + 1]
                     end
                 end))
-        count
     end
     def count_appearances(s,k) do
-        count = (String.split(s, " ")
+        (String.split(s, " ")
             |> Enum.reduce(0,
                 fn (elem,a2) ->
                     if elem == k do
@@ -21,9 +20,43 @@ defmodule Entropy do
                         a2
                     end
                 end))
-        count
     end
-end
-defmodule Results do
-    defstruct [files: nil, classes: nil]
+    def words(s) do
+        (String.split(s, " ")
+            |> Enum.reduce(0,
+                fn (_,a2) ->
+                    a2 + 1
+                end))
+    end
+    # Crap
+    def weight(s,k) do
+        count_appearances(s,k)/words(s)
+    end
+    # Crap
+    def weight_by_class(c,k) do
+        Enum.reduce(c, 0,
+            fn(str, v) -> weight(str, k) + v end)/length(c)
+    end
+    # Crap
+    def overall_weights(classes, k) do
+        classes
+            |> Enum.map(fn(class) -> weight_by_class(class, k) end)
+    end
+    def add(ls, []) do
+        ls
+    end
+    def add([], ls) do
+        ls
+    end
+    def add([h|t], [h2|t2]) do
+        [h+h2|add(t,t2)]
+    end
+    def combine_many(results) do
+        results
+            |> Enum.map(fn(result) ->
+                    Enum.map(result, fn(val) -> 
+                        val/length(results) end) end)
+            |> Enum.reduce([],
+                fn(temp,params)->add(temp,params) end)
+    end
 end
