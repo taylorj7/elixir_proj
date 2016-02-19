@@ -1,0 +1,29 @@
+defmodule Entropy do
+    def count_unique_words(s)  do
+        [_, count] = (String.split(s, " ")
+            |> Enum.reduce([[],0],
+                fn (elem,[a1,a2]) ->
+                    if Enum.any?(a1, fn(e) -> e == elem end) do
+                        [a1,a2]
+                    else
+                        [a1 ++ [elem], a2 + 1]
+                    end
+                end))
+        count
+    end
+    def count_appearances(s,k) do
+        count = (String.split(s, " ")
+            |> Enum.reduce(0,
+                fn (elem,a2) ->
+                    if elem == k do
+                        a2 + 1
+                    else
+                        a2
+                    end
+                end))
+        count
+    end
+end
+defmodule Results do
+    defstruct [files: nil, classes: nil]
+end
