@@ -1,4 +1,5 @@
 defmodule Entropy do
+    #Count how many different words there are in the doccument
     def count_unique_words(s)  do
         (String.split(s)
             |> Enum.reduce([[],0],
@@ -10,6 +11,7 @@ defmodule Entropy do
                     end
                 end))
     end
+    #Count how often the tartget word occurs
     def count_appearances(s,k) do
         (String.split(s)
             |> Enum.reduce(0,
@@ -21,6 +23,7 @@ defmodule Entropy do
                     end
                 end))
     end
+    #word count for the doccument
     def words(s) do
         (String.split(s)
             |> Enum.reduce(0,
@@ -28,16 +31,16 @@ defmodule Entropy do
                     a2 + 1
                 end))
     end
-    # Crap
+    # Percentage of doccument that is target word
     def weight(s,k) do
         count_appearances(s,k)/words(s)
     end
-    # Crap
+    # How important that word is for the specified class
     def weight_by_class(c,k) do
         Enum.reduce(c, 0,
             fn(str, v) -> weight(str, k) + v end)/length(c)
     end
-    # Crap
+    # map computations over classes
     def overall_weights(classes, k) do
         classes
             |> Enum.map(fn(class) -> weight_by_class(class, k) end)
@@ -59,6 +62,8 @@ defmodule Entropy do
             |> Enum.reduce([],
                 fn(temp,params)->add(temp,params) end)
     end
+    
+    # Do the weird math
     def classify(doc, classes, lambdas, features) do
         c = calc_constant(doc,classes,lambdas,features)
         i = for j <- 1..length(classes), do: j
@@ -77,12 +82,14 @@ defmodule Entropy do
                                             {-10,0})
         class
     end
+    # Calculate each constant from alg
     def calc_constant(doc, classes, lambdas, features) do
         classes
             |> ParallelEnum.preduce(fn(class) -> :math.pow(2.71828,feature_calc(doc,class,lambdas,features)) end, 
                                     fn(x,a) -> x + a end, 
                                     0)
     end
+    # Get the values from the given feature functions
     def feature_calc(doc,class,lambdas,features) do
         func = (fn({lambda,feat}, accum) -> (lambda*feat.(doc,class) + accum) end)
         List.zip([lambdas,features])
@@ -109,6 +116,8 @@ defmodule Entropy do
                     acc + temp2 end)
                 Utility.natLog(v1/v2)/constant end)
     end
+    
+    # Overall control function
     def train(docs, classes, lambdas, features) do
         deltas = [0.01,0.01]#calculate_deltas(docs, classes, lambdas, features)
         err = Enum.reduce(deltas, 0, (fn(x,a) -> a + (x*x) end))
@@ -121,6 +130,7 @@ defmodule Entropy do
 end
 
 defmodule Utility do
+    # Do the natural log because elixir does not have that built in
     def natLog(x) do
         :math.log10(x)/:math.log10(2.719)
     end
