@@ -1,6 +1,6 @@
 defmodule Entropy do
     def count_unique_words(s)  do
-        (String.split(s, " ")
+        (String.split(s)
             |> Enum.reduce([[],0],
                 fn (elem,[a1,a2]) ->
                     if Enum.any?(a1, fn(e) -> e == elem end) do
@@ -11,7 +11,7 @@ defmodule Entropy do
                 end))
     end
     def count_appearances(s,k) do
-        (String.split(s, " ")
+        (String.split(s)
             |> Enum.reduce(0,
                 fn (elem,a2) ->
                     if elem == k do
@@ -22,7 +22,7 @@ defmodule Entropy do
                 end))
     end
     def words(s) do
-        (String.split(s, " ")
+        (String.split(s)
             |> Enum.reduce(0,
                 fn (_,a2) ->
                     a2 + 1
@@ -58,5 +58,61 @@ defmodule Entropy do
                         val/length(results) end) end)
             |> Enum.reduce([],
                 fn(temp,params)->add(temp,params) end)
+    end
+    def classify(doc, classes, lambdas, features) do
+        c = calc_constant(doc,classes,lambdas,features)
+        i = for j <- 0..length(classes), do: j
+        classInd = List.zip(classes, i)
+        [_, class] = classInd
+                    |> parallelEnum.preduce(fn([class, k]) ->
+                                             [:math.pow(2.71828, feature_calc(doc,class,lambdas,features))/c, k] 
+                                                end,
+                                            fn([val,class],[maxval,maxclass]) ->
+                                                if val > maxval do
+                                                    [val, class]
+                                                else
+                                                    [maxval, maxclass]
+                                                end
+                                                end,
+                                            [-10,0])
+        class
+    end
+    def calc_constant(doc, classes, lambdas, features) do
+        classes
+            |> parallelEnum.preduce(fn(class) -> :math.pow(2.71828,feature_calc(doc,class,lambdas,features)) end, 
+                                    fn(x,a) -> x + a end, 
+                                    0)
+    end
+    def feature_calc(doc,class,lambdas,features) do
+        List.zip(lambdas,features)
+            |> Enum.reduce(0, fn([lambda,feat], Accum) -> lambda*feat.(doc,class) + Accum end)
+    end
+end
+defmodule Utility do
+    def natLog(x) do
+        :math.log10(x)/:math.log10(2.719)
+    end
+end
+defmodule parallelEnum do
+    def pmap(collection, fun) do
+        me = self
+        collection
+            |> Enum.map(fn (elem) ->
+                spawn_link fn -> (send me, { self, fun.(elem) }) end end) 
+            |> Enum.map(fn (pid) ->
+                receive do { ^pid, result } -> result end
+                end)
+    end
+    def preduce(collection, fun, join, start) do
+        me = self
+        collection
+            |> Enum.map(fn (elem) ->
+                spawn_link fn -> (send me, { self, fun.(elem) }) end end) 
+            |> Enum.map(fn (pid) ->
+                receive do { ^pid, result } -> result end
+                end)
+            |> Enum.reduce(start, fn(val, a) ->
+                join.(val, a)
+                end)
     end
 end
