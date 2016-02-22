@@ -27,11 +27,22 @@ defmodule ReadFiles do
     end
     
     
-    def repl files do
+    def repl data do
+        {classes, lambdas, funcs} = data
         input = IO.gets("Enter search term or 'q' to quit: ")
-        unless input == "q\n"  do
-            IO.inspect(input)
-            repl files
+        input = String.rstrip(input)
+        unless input == "q"  do
+            name = Path.join("./Documents",input)
+            secondName = Path.absname(name)
+            {result,inputFile} = File.read(secondName)
+            IO.inspect(secondName)
+            if result == :ok do
+                IO.inspect(Entropy.classify(inputFile,classes,lambdas,funcs))
+                IO.inspect(inputFile)
+            else
+                IO.inspect(result)
+            end
+            repl data
         end
     end
     
@@ -45,9 +56,15 @@ defmodule ReadFiles do
         class2 = Enum.map(class2, nameFilter)
         IO.inspect(class1)
         IO.inspect(class2)
-        
-        repl {class1,class2}
+        #generate classified stuff
+        classes = [1,2]
+        initial = [1,1]
+        documents = ["hogwash and slop", "who knows anymore"]
+        featureFuncs = [(fn(d,c) -> Entropy.count_appearances(d, "the")/Entropy.words(d) end), (fn(d,c) -> Entropy.count_appearances(d,"a")/Entropy.words(d) end)]
+        lambdas = Entropy.train(documents,classes,initial,featureFuncs)
+        #lambdas = [1,1]
+        repl {classes,lambdas,featureFuncs}
     end
         
-    
 end
+

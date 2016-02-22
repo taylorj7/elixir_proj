@@ -61,39 +61,71 @@ defmodule Entropy do
     end
     def classify(doc, classes, lambdas, features) do
         c = calc_constant(doc,classes,lambdas,features)
-        i = for j <- 0..length(classes), do: j
-        classInd = List.zip(classes, i)
-        [_, class] = classInd
-                    |> parallelEnum.preduce(fn([class, k]) ->
-                                             [:math.pow(2.71828, feature_calc(doc,class,lambdas,features))/c, k] 
+        i = for j <- 1..length(classes), do: j
+        classInd = List.zip([classes, i])
+        {_, class} = classInd
+                    |> ParallelEnum.preduce(fn({class, k}) ->
+                                             {:math.pow(2.71828, feature_calc(doc,class,lambdas,features))/c, k} 
                                                 end,
-                                            fn([val,class],[maxval,maxclass]) ->
+                                            fn({val,class},{maxval,maxclass}) ->
                                                 if val > maxval do
-                                                    [val, class]
+                                                    {val, class}
                                                 else
-                                                    [maxval, maxclass]
+                                                    {maxval, maxclass}
                                                 end
                                                 end,
-                                            [-10,0])
+                                            {-10,0})
         class
     end
     def calc_constant(doc, classes, lambdas, features) do
         classes
-            |> parallelEnum.preduce(fn(class) -> :math.pow(2.71828,feature_calc(doc,class,lambdas,features)) end, 
+            |> ParallelEnum.preduce(fn(class) -> :math.pow(2.71828,feature_calc(doc,class,lambdas,features)) end, 
                                     fn(x,a) -> x + a end, 
                                     0)
     end
     def feature_calc(doc,class,lambdas,features) do
-        List.zip(lambdas,features)
-            |> Enum.reduce(0, fn([lambda,feat], Accum) -> lambda*feat.(doc,class) + Accum end)
+        func = (fn({lambda,feat}, accum) -> (lambda*feat.(doc,class) + accum) end)
+        List.zip([lambdas,features])
+            |> Enum.reduce(0, func)
+    end
+    
+    def calculate_deltas(docs, classes, lambdas, features) do
+        constant = (Enum.reduce(classes, 0, fn(class,accum) -> 
+                accum + Enum.reduce(docs, 0, fn(doc,ac) ->
+                    ac + Enum.reduce(features, 0, fn(f, acc) ->
+                        acc + f.(doc, class) end) end) end))
+        features
+            |> Enum.map(fn(feature) ->
+                v1 = List.zip([docs, classes])
+                        |> Enum.reduce(0, fn({d,c},a) -> a + feature.(d,c)end)
+                v2 = Enum.reduce(docs, 0, fn(doc, acc) ->
+                    lambdaFeature = List.zip([lambdas, features])
+                    temp = Enum.reduce(classes, 0 ,fn(class, a) -> a + :math.pow(2.71828, Enum.reduce(lambdaFeature, 0, fn({lam, f}) -> lam*(f.(doc, class)) end)) end)
+                    temp2 = Enum.reduce(classes, 0, 
+                        fn(class, a) -> ((:math.pow(2.71828, Enum.reduce(lambdaFeature, 0, 
+                            fn({lam, f}) -> lam*(f.(doc, class)) 
+                            end))*feature.(doc,class))/temp) + a 
+                        end)
+                    acc + temp2 end)
+                Utility.natLog(v1/v2)/constant end)
+    end
+    def train(docs, classes, lambdas, features) do
+        deltas = [0.01,0.01]#calculate_deltas(docs, classes, lambdas, features)
+        err = Enum.reduce(deltas, 0, (fn(x,a) -> a + (x*x) end))
+        if (err > 0.01) do
+            train(docs, classes, add(lambdas, deltas), features)
+        else
+            add(lambdas, deltas)
+        end
     end
 end
+
 defmodule Utility do
     def natLog(x) do
         :math.log10(x)/:math.log10(2.719)
     end
 end
-defmodule parallelEnum do
+defmodule ParallelEnum do
     def pmap(collection, fun) do
         me = self
         collection
